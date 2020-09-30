@@ -121,18 +121,20 @@ class MakeModelCommand extends ModelMakeCommand
 //            }
 //        }
 
-        $dir = dirname($file);
-        if (!file_exists($dir)) {
-            if ($this->confirm("Directory [$dir] does not exist! Create?", false)) {
-                mkdir($dir, 0755, true);
-                $this->comment('Directory created');
-            } else {
-                return;
-            }
-        }
-        $handler = fopen($file, 'w');
-        fwrite($handler, $content);
-        fclose($handler);
+        $this->files->put($file, $content);
+
+//        $dir = dirname($file);
+//        if (!file_exists($dir)) {
+//            if ($this->confirm("Directory [$dir] does not exist! Create?", false)) {
+//                mkdir($dir, 0755, true);
+//                $this->comment('Directory created');
+//            } else {
+//                return;
+//            }
+//        }
+//        $handler = fopen($file, 'w');
+//        fwrite($handler, $content);
+//        fclose($handler);
         // todo, also make model if absent. eg. App\Models\User & App\Models\Contracts\UserContract
         $this->comment(sprintf("%s `%s` %s", 'Contract', $modelShortName, ($existedAlready ? 'updated.' : 'created.')));
     }
@@ -140,7 +142,7 @@ class MakeModelCommand extends ModelMakeCommand
     protected function config($name, $default = '')
     {
 //        return config(IdeReferenceServiceProvider::CONFIG_NAMESPACE . ".model.$name", $default);
-        return config('overlord.model.' . $name, $default);
+        return config('overlord-model.' . $name, $default);
     }
 
     /**
@@ -181,12 +183,17 @@ class MakeModelCommand extends ModelMakeCommand
             ));
     }
 
+    protected function toModelName(string $tableName)
+    {
+        return ucfirst(Str::camel($tableName));
+    }
+
     protected function generateModelIfNotExists(string $namespace, string $table, bool $useSoftDeletes)
     {
         $namespacePartials = explode('\\', $namespace);
         array_pop($namespacePartials);
         $namespace = implode('\\', $namespacePartials);
-        $model = ucfirst(ColumnSchema::camelCase($table));
+        $model = $this->toModelName($table);
         $filename = $this->concatPath(base_path(), $this->config('dir'), "{$model}.php");
         if (file_exists($filename)) {
             $this->line(sprintf('<comment>Skipping</comment> <info>%s</info>, exited already.', substr($filename, strlen(base_path()) + 1)));
@@ -201,7 +208,8 @@ class MakeModelCommand extends ModelMakeCommand
             $useBody = '';
         }
 
-        file_put_contents(
+//        file_put_contents(
+        $this->files->put(
             $filename,
             <<<EOF
 <?php
@@ -335,7 +343,7 @@ EOF
                 break;
             case 'enum':
                 $this->willUse(Rule::class);
-                $rules = [new DumperExpression('Rule::in(' . Helper::dump($column->values, true) . ')')];
+                $rules = [new DumperExpression('Rule::in(' . Dumper::dump($column->values, true) . ')')];
                 break;
         }
 
@@ -451,7 +459,7 @@ EOF
             }
         }
 
-        $modelName = ucfirst(Str::camel($table)) . 'Contract';
+        $modelName = $this->toModelName($table) . 'Contract';
         $baseModelName = $this->config('baseModel', 'App\Models\Model');
         // todo add relations
         $relations = [];
