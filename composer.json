@@ -9,7 +9,7 @@
     "require": {
         "php": ">=7.4",
         "laravel/framework": ">=7",
-        "fk/helpers": "^3"
+        "fk/helpers": "^2"
     },
     "extra": {
         "laravel": {

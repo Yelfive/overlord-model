@@ -13,6 +13,7 @@ use Carbon\Carbon;
 //use fk\reference\exceptions\InvalidVariableException;
 //use fk\reference\IdeReferenceServiceProvider;
 use fk\helpers\Dumper;
+use Overlord\Model\Exceptions\BadTableNameException;
 use Overlord\Model\Support\ColumnSchema;
 use Overlord\Model\Support\DumperExpression;
 
@@ -37,15 +38,18 @@ class MakeModelCommand extends ModelMakeCommand
 
     protected $description = 'Generate model class instead of using `php artisan make:model`';
 
-    protected $uses = [];
+    protected array $uses = [];
 
     protected int $offset = 0;
 
     public function handle()
     {
         do {
-            $success = parent::handle();
-            if ($success === false) return false;
+            try {
+                parent::handle();
+            } catch (BadTableNameException $e) {
+                return false;
+            }
         } while ($this->next());
 
         return true;
@@ -58,6 +62,11 @@ class MakeModelCommand extends ModelMakeCommand
         } else {
             return parent::argument($key);
         }
+    }
+
+    protected function alreadyExists($rawName)
+    {
+        return false;
     }
 
     protected function getStub()
@@ -89,76 +98,59 @@ class MakeModelCommand extends ModelMakeCommand
 
     protected function generateModel()
     {
-//        foreach ($tables as $table) {
         $this->init();
         $this->generate($this->argument('name'));
-//        }
     }
 
-    protected function write($modelShortName, $content)
+    protected function write($modelName, $content)
     {
-        $file = base_path($this->config('dir')) . "/Contracts/$modelShortName.php";
+        $file = base_path($this->config('dir')) . "/Contracts/$modelName.php";
         $file = str_replace('\\', '/', $file);
         $existedAlready = file_exists($file);
-        // Contract does not need to confirm when overwriting
-//        if (!$this->option('abstract')) {
-//            if (
-//                $existedAlready
-//                &&
-//                (
-//                    $this->option('overwrite') === false
-//                    || $this->doubleConfirm($modelShortName) !== $modelShortName
-//                )
-//            ) {
-//                if ($this->option('overwrite')) {
-//                    $this->error("Confirm failed. The answer is `$modelShortName`");
-//                    sleep(1);
-//                }
-//                $this->warn("Model `$modelShortName` already exists at : $file");
-//                $this->compareModel($file, $content);
-//                $this->error('Use option --overwrite if you want to overwrite the existed file.');
-//                return;
-//            }
-//        }
 
         $this->files->put($file, $content);
 
-//        $dir = dirname($file);
-//        if (!file_exists($dir)) {
-//            if ($this->confirm("Directory [$dir] does not exist! Create?", false)) {
-//                mkdir($dir, 0755, true);
-//                $this->comment('Directory created');
-//            } else {
-//                return;
-//            }
-//        }
-//        $handler = fopen($file, 'w');
-//        fwrite($handler, $content);
-//        fclose($handler);
         // todo, also make model if absent. eg. App\Models\User & App\Models\Contracts\UserContract
-        $this->comment(sprintf("%s `%s` %s", 'Contract', $modelShortName, ($existedAlready ? 'updated.' : 'created.')));
+        $this->comment(sprintf("%s `%s` %s", 'Contract', $modelName, ($existedAlready ? 'updated.' : 'created.')));
     }
 
     protected function config($name, $default = '')
     {
-//        return config(IdeReferenceServiceProvider::CONFIG_NAMESPACE . ".model.$name", $default);
         return config('overlord-model.' . $name, $default);
+    }
+
+    protected function trySnake()
+    {
+
     }
 
     /**
      * @param string $tableName
+     * @throws BadTableNameException
      */
     protected function generate(string $tableName)
     {
+        $singular = Str::singular($tableName);
+        $isSingular = $singular === $tableName;
+
         $schema = $this->getTableSchema(strtolower($tableName));
         // if $tableWithoutPrefix is not a table, it must be a class name
-        if (!$schema->columns) {
-            $table = Str::snake($tableName);
-            $schema = $this->getTableSchema($table);
-        }
+//        if (!$schema->columns) {
+//            $table = Str::snake($tableName);
+//            $schema = $this->getTableSchema($table);
+//        }
+//        if (!$schema->columns) {
+//            if ($isSingular) {
+//                // try plural
+//                $plural = Str::pluralStudly($tableName);
+//            } else {
+//                // try singular
+//            }
+////            return $this->generate($isSingular);
+//        }
         if (!$schema->columns) {
             $this->alert(sprintf('No column found for <info>%s</info>, maybe prefix missing ?', $tableName));
-            return;
+            throw new BadTableNameException();
         }
 
         [$namespace, $table, $useSoftDeletes] = $this->generateContract($schema);
@@ -400,9 +392,29 @@ EOF
         return ob_get_clean();
     }
 
-    protected function getTableSchema($table): TableSchema
+    /**
+     * todo, should allow --table option to specify which table to generate base on.
+     * @param string $table Name of the table, or one of its plural, singular, singular Model name form
+     * @return TableSchema
+     */
+    protected function getTableSchema(string $table): TableSchema
     {
-        return new TableSchema($table);
+        $schema = new TableSchema($table);
+        if (!$schema->columns) {
+            $snake = Str::snake($table);
+            if ($table !== $snake) {
+                $schema = new TableSchema($snake);
+            }
+
+            if (!$schema->columns) {
+                $plural = Str::plural($snake);
+                if (strcasecmp($plural, $snake) !== 0) {
+                    $schema = new TableSchema($plural);
+                }
+            }
+        }
+
+        return $schema;
     }
 
     protected function getArguments()
@@ -414,11 +426,6 @@ EOF
         return [
             ['names', InputArgument::REQUIRED | InputArgument::IS_ARRAY, 'The name(s) of the class(es) or table(s)'],
         ];
-    }
-
-    protected function getNameInput()
-    {
-        return $this->argument('names')[$this->offset];
     }
 
     /**
