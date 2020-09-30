@@ -1,0 +1,20 @@
+{
+    "name": "yelfive/overlord-model",
+    "description": "Rules and PHPDoc generation for Laravel models",
+    "autoload": {
+        "psr-4": {
+            "Overlord\\Model\\": "src/Model"
+        }
+    },
+    "require": {
+        "php": ">=7.4",
+        "laravel/framework": ">=7"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Overlord\\Model\\ModelServiceProvider"
+            ]
+        }
+    }
+}
