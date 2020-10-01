@@ -94,6 +94,10 @@ class MakeModelCommand extends ModelMakeCommand
         }
     }
 
+    /**
+     * @param string $rawName
+     * @return false Indicates that the corresponding class should always be (re-)generated.
+     */
     protected function alreadyExists($rawName)
     {
         return false;
@@ -103,7 +107,7 @@ class MakeModelCommand extends ModelMakeCommand
     {
         return $this->option('pivot')
             ? $this->resolveStubPath('/stubs/model.pivot.stub')
-            : __DIR__ . '/stubs/model.stub.php';
+            : __DIR__ . '/stubs/model.contract.stub.php';
     }
 
     /**
@@ -175,7 +179,7 @@ class MakeModelCommand extends ModelMakeCommand
 
         [$namespace, $table, $useSoftDeletes] = $this->generateContract($schema);
 
-        $this->generateModelIfNotExists($namespace, $table, $useSoftDeletes);
+        $this->generateModelIfNotExists($namespace, $table, $useSoftDeletes, $schema);
     }
 
     protected function concatPath(...$partials)
@@ -200,7 +204,7 @@ class MakeModelCommand extends ModelMakeCommand
         return ucfirst(Str::singular(Str::camel($tableName)));
     }
 
-    protected function generateModelIfNotExists(string $namespace, string $table, bool $useSoftDeletes)
+    protected function generateModelIfNotExists(string $namespace, string $table, bool $useSoftDeletes, TableSchema $schema)
     {
         $namespacePartials = explode('\\', $namespace);
         array_pop($namespacePartials);
@@ -212,26 +216,14 @@ class MakeModelCommand extends ModelMakeCommand
             return false;
         }
 
-        if ($useSoftDeletes) {
-            $useHead = "\nuse " . SoftDeletes::class . ";\n";
-            $useBody = "\n    use SoftDeletes;";
-        } else {
-            $useHead = '';
-            $useBody = '';
-        }
-
         $this->writeFile(
             $filename,
-            <<<EOF
-<?php
-
-namespace {$namespace};
-{$useHead}
-class {$model} extends Contracts\\{$model}Contract
-{{$useBody}
-}
-
-EOF
+            $this->render([
+                'useSoftDeletes' => $useSoftDeletes,
+                'namespace' => $namespace,
+                'model' => $model,
+                'columns' => $schema->columns,
+            ], __DIR__ . '/stubs/model.stub.php')
         );
         $this->line("Model <info>$model</info> created.");
         return true;
@@ -406,11 +398,11 @@ EOF
         }
     }
 
-    protected function render($params)
+    protected function render($params, $file = null)
     {
         extract($params);
         ob_start();
-        include $this->getStub();
+        include($file ?? $this->getStub());
         return ob_get_clean();
     }
 
