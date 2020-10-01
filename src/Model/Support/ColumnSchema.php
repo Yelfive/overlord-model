@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
  */
 class ColumnSchema
 {
+    protected array $attributes = [];
     /** @var string */
     public $tableCatalog;
     /** @var string */
@@ -60,13 +61,17 @@ class ColumnSchema
     public $size;
     /** @var array|null Array for `enum` */
     public $values = null;
+//    protected $generationExpression = '';
 
     public function __construct($columns)
     {
         foreach ($columns as $column => $value) {
-            $column = Str::camel($column);
+//            if (strpos($column, '_') !== false) {
+            $column = Str::camel(strtolower($column));
+//            }
             $this->$column = $this->getValue($column, $value);
         }
+//        dd($this);
     }
 
     protected function getValue($column, $value)
@@ -88,7 +93,7 @@ class ColumnSchema
             $type = $matches[1];
             if (false !== strpos($type, 'int') || $type === 'decimal' || $type === 'float') {
                 $this->size = $matches[2];
-                $this->unsigned = $matches[3] ?? '' === 'unsigned' ? true : false;
+                $this->unsigned = ($matches[3] ?? '') === 'unsigned' ? true : false;
             }
 
             /* enum('no','yes') */
@@ -104,7 +109,7 @@ class ColumnSchema
         }
     }
 
-    public static function camelCase($string)
+    private static function camelCase($string)
     {
         $string = strtolower($string);
         return preg_replace_callback('/_(\w)/', function ($match) {

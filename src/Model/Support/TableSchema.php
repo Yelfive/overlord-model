@@ -27,6 +27,7 @@ class TableSchema
     {
         $this->tablePrefix = DB::getTablePrefix();
         $this->databaseName = DB::getDatabaseName();
+        // todo, also try table with out prefix, exact match comes first.
         $this->tableName = "{$this->tablePrefix}{$table}";
         $this->queryColumns();
     }

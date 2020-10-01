@@ -13,6 +13,8 @@ class ModelServiceProvider extends ServiceProvider
 {
     public function register()
     {
+        $this->mergeConfigFrom(__DIR__ . '/../config/overlord-model.php', 'overlord-model');
+        // todo, check if it works
         $this->app->register(EventServiceProvider::class);
     }
 

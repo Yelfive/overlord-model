@@ -7,7 +7,7 @@
 return [
     // todo, should check if the model in `artisan overlord:model model` starts with this namespace
     'namespace' => 'App\Models',
-    'baseModel' => 'App\Models\Model',
+    'base_model' => 'App\Models\Model',
     'dir' => 'app\Models',
-    'preferArrayRules' => false,
+    'prefer_array_rules' => true,
 ];

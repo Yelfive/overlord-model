@@ -8,27 +8,17 @@
 namespace Overlord\Model\Console;
 
 use Carbon\Carbon;
-
-//use fk\reference\exceptions\FileNotFoundException;
-//use fk\reference\exceptions\InvalidVariableException;
-//use fk\reference\IdeReferenceServiceProvider;
 use fk\helpers\Dumper;
+use fk\helpers\DumperExpression;
 use Overlord\Model\Exceptions\BadTableNameException;
 use Overlord\Model\Support\ColumnSchema;
-use Overlord\Model\Support\DumperExpression;
-
-//use Overlord\Model\Support\Helper;
 use Overlord\Model\Support\TableSchema;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Console\ModelMakeCommand;
-
-//use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
-
-//use Symfony\Component\VarDumper\VarDumper;
 
 class MakeModelCommand extends ModelMakeCommand
 {
@@ -38,6 +28,8 @@ class MakeModelCommand extends ModelMakeCommand
 
     protected $description = 'Generate model class instead of using `php artisan make:model`';
 
+    protected $type = 'Model(s)';
+
     protected array $uses = [];
 
     protected int $offset = 0;
@@ -46,13 +38,51 @@ class MakeModelCommand extends ModelMakeCommand
     {
         do {
             try {
-                parent::handle();
+//                parent::handle();
+                $this->parentHandle();
             } catch (BadTableNameException $e) {
                 return false;
             }
         } while ($this->next());
 
         return true;
+    }
+
+    public function parentHandle()
+    {
+        // First we need to ensure that the given name is not a reserved word within the PHP
+        // language and that the class name will actually be valid. If it is not valid we
+        // can error now and prevent from polluting the filesystem using invalid files.
+        if ($this->isReservedName($this->getNameInput())) {
+            $this->error('The name "' . $this->getNameInput() . '" is reserved by PHP.');
+
+            return false;
+        }
+
+        $name = $this->qualifyClass($this->getNameInput());
+
+        $path = $this->getPath($name);
+
+        // Next, We will check to see if the class already exists. If it does, we don't want
+        // to create the class and overwrite the user's code. So, we will bail out so the
+        // code is untouched. Otherwise, we will continue generating this class' files.
+        if ((!$this->hasOption('force') ||
+                !$this->option('force')) &&
+            $this->alreadyExists($this->getNameInput())) {
+            $this->error($this->type . ' already exists!');
+
+            return false;
+        }
+
+        // Next, we will generate the path to the location where this class' file should get
+        // written. Then, we will build the class and make the proper replacements on the
+        // stub files so that it gets the correctly formatted namespace and class name.
+        $this->makeDirectory($path);
+
+//        $this->files->put($path, $this->sortImports($this->buildClass($name)));
+        $this->buildClass($name);
+
+        $this->info($this->type . ' created successfully.');
     }
 
     public function argument($key = null)
@@ -102,16 +132,27 @@ class MakeModelCommand extends ModelMakeCommand
         $this->generate($this->argument('name'));
     }
 
-    protected function write($modelName, $content)
+    protected function write(string $modelName, string $content)
     {
         $file = base_path($this->config('dir')) . "/Contracts/$modelName.php";
         $file = str_replace('\\', '/', $file);
         $existedAlready = file_exists($file);
 
-        $this->files->put($file, $content);
+        $this->writeFile($file, $content);
 
         // todo, also make model if absent. eg. App\Models\User & App\Models\Contracts\UserContract
         $this->comment(sprintf("%s `%s` %s", 'Contract', $modelName, ($existedAlready ? 'updated.' : 'created.')));
+    }
+
+    protected function writeFile($filename, $content)
+    {
+        if ($this->option('raw')) {
+            $this->output->writeln("<info># {$filename}</info>");
+            $this->output->writeln($content);
+        } else {
+            $this->makeDirectory($filename);
+            $this->files->put($filename, $content);
+        }
     }
 
     protected function config($name, $default = '')
@@ -119,37 +160,16 @@ class MakeModelCommand extends ModelMakeCommand
         return config('overlord-model.' . $name, $default);
     }
 
-    protected function trySnake()
-    {
-
-    }
-
     /**
-     * @param string $tableName
+     * @param string $name
      * @throws BadTableNameException
      */
-    protected function generate(string $tableName)
+    protected function generate(string $name)
     {
-        $singular = Str::singular($tableName);
-        $isSingular = $singular === $tableName;
+        $schema = $this->getTableSchema($name);
 
-        $schema = $this->getTableSchema(strtolower($tableName));
-        // if $tableWithoutPrefix is not a table, it must be a class name
-//        if (!$schema->columns) {
-//            $table = Str::snake($tableName);
-//            $schema = $this->getTableSchema($table);
-//        }
-//        if (!$schema->columns) {
-//            if ($isSingular) {
-//                // try plural
-//                $plural = Str::pluralStudly($tableName);
-//            } else {
-//                // try singular
-//            }
-////            return $this->generate($isSingular);
-//        }
         if (!$schema->columns) {
-            $this->alert(sprintf('No column found for <info>%s</info>, maybe prefix missing ?', $tableName));
+            $this->alert(sprintf('No column found for <info>%s</info>, maybe prefix missing ?', $name));
             throw new BadTableNameException();
         }
 
@@ -177,7 +197,7 @@ class MakeModelCommand extends ModelMakeCommand
 
     protected function toModelName(string $tableName)
     {
-        return ucfirst(Str::camel($tableName));
+        return ucfirst(Str::singular(Str::camel($tableName)));
     }
 
     protected function generateModelIfNotExists(string $namespace, string $table, bool $useSoftDeletes)
@@ -188,7 +208,7 @@ class MakeModelCommand extends ModelMakeCommand
         $model = $this->toModelName($table);
         $filename = $this->concatPath(base_path(), $this->config('dir'), "{$model}.php");
         if (file_exists($filename)) {
-            $this->line(sprintf('<comment>Skipping</comment> <info>%s</info>, exited already.', substr($filename, strlen(base_path()) + 1)));
+            $this->line(sprintf('<comment>Skipping</comment> <info>%s</info>, existed already.', substr($filename, strlen(base_path()) + 1)));
             return false;
         }
 
@@ -200,8 +220,7 @@ class MakeModelCommand extends ModelMakeCommand
             $useBody = '';
         }
 
-//        file_put_contents(
-        $this->files->put(
+        $this->writeFile(
             $filename,
             <<<EOF
 <?php
@@ -264,11 +283,11 @@ EOF
      * Rule of one column
      * @param ColumnSchema $column
      * @return array|string
-     * @throws InvalidVariableException
+     * @throws \Exception
      */
     protected function getColumnRules($column)
     {
-        $returnArray = false;
+        $preferArray = $this->config('prefer_array_rules');
         $rules = [];
         switch ($column->columnType) {
             case 'tinyint':
@@ -336,12 +355,14 @@ EOF
             case 'enum':
                 $this->willUse(Rule::class);
                 $rules = [new DumperExpression('Rule::in(' . Dumper::dump($column->values, true) . ')')];
+                $preferArray = true;
                 break;
         }
 
         if ($column->columnKey === 'UNI') {
             $this->willUse(Rule::class);
             array_unshift($rules, new DumperExpression('Rule::unique($this->table)->ignore($this->id)'));
+            $preferArray = true;
         }
         if ($column->isNullable) {
             array_unshift($rules, 'nullable');
@@ -351,7 +372,7 @@ EOF
 
         if (!$rules) $rules[] = '';
 
-        return $returnArray || $this->config('preferArrayRules') ? $rules : implode('|', $rules);
+        return $preferArray ? $rules : implode('|', $rules);
     }
 
     protected function getColumnType($type)
@@ -378,7 +399,8 @@ EOF
             case 'datetime':
             case 'time':
             case 'timestamp':
-                return '\\' . Carbon::class;
+                $this->willUse(Carbon::class);
+                return class_basename(Carbon::class);
             default:
                 return $type;
         }
@@ -399,19 +421,33 @@ EOF
      */
     protected function getTableSchema(string $table): TableSchema
     {
-        $schema = new TableSchema($table);
-        if (!$schema->columns) {
-            $snake = Str::snake($table);
-            if ($table !== $snake) {
-                $schema = new TableSchema($snake);
-            }
+        // $table = App\Models\Users, should generate User model under directory app\Models
+        /*
+         * Users/users/user     -> App\Models\User
+         * App\Models\User(s)   -> App\Models\User
+         * App\Entities\User(s) -> App\Entities\User
+         *
+         * overlord:model A --table b ----> App\Models\A protected $table = 'b';
+         */
+        if (Str::contains($table, '\\')) {
+            $this->laravel->getNamespace();
+            $table = class_basename($table);
+        }
 
-            if (!$schema->columns) {
-                $plural = Str::plural($snake);
-                if (strcasecmp($plural, $snake) !== 0) {
-                    $schema = new TableSchema($plural);
-                }
-            }
+        $schema = new TableSchema($table);
+        if ($schema->columns) return $schema;
+
+        $snake = Str::snake($table);
+
+        if (strcasecmp($table, $snake) !== 0) {
+            $schema = new TableSchema($snake);
+            if ($schema->columns) return $schema;
+        }
+
+        $plural = Str::plural($snake);
+        if (strcasecmp($plural, $snake) !== 0) {
+            $schema = new TableSchema($plural);
+            if ($schema->columns) return $schema;
         }
 
         return $schema;
@@ -420,9 +456,6 @@ EOF
     protected function getArguments()
     {
         // todo, plural of the table name, singular for the model
-//        return [
-//            ['tables', InputArgument::REQUIRED | InputArgument::IS_ARRAY, 'Name(s)/Model(s) for the table']
-//        ];
         return [
             ['names', InputArgument::REQUIRED | InputArgument::IS_ARRAY, 'The name(s) of the class(es) or table(s)'],
         ];
@@ -439,10 +472,10 @@ EOF
     protected function getOptions()
     {
         return array_merge(parent::getOptions(), [
-            ['dir', 'd', InputOption::VALUE_OPTIONAL, 'Directory for the models to be placed', 'App\Models'],
+//            ['dir', 'd', InputOption::VALUE_OPTIONAL, 'Directory for the models to be placed', 'App\Models'],
 //            ['overwrite', null, InputOption::VALUE_NONE, 'Overwrite if model exists when passed'],
 //            ['force', 'f', InputOption::VALUE_NONE, 'Force to create model even when no column fetched from database'],
-            ['raw', null, InputOption::VALUE_NONE, 'Return the content without writing into file'],
+            ['raw', null, InputOption::VALUE_NONE, 'Return the content to stdout instead of file'],
         ]);
     }
 
@@ -467,7 +500,7 @@ EOF
         }
 
         $modelName = $this->toModelName($table) . 'Contract';
-        $baseModelName = $this->config('baseModel', 'App\Models\Model');
+        $baseModelName = $this->config('base_model', 'App\Models\Model');
         // todo add relations
         $relations = [];
         $content = $this->render([
@@ -482,11 +515,11 @@ EOF
             'relations' => $relations,
             'uses' => $this->uses,
         ]);
-        if ($this->option('raw')) {
-            $this->line($content);
-        } else {
-            $this->write($modelName, $content);
-        }
+//        if ($this->option('raw')) {
+//            $this->line($content);
+//        } else {
+        $this->write($modelName, $content);
+//        }
 
         return [$namespace, $table, $useSoftDeletes];
     }
