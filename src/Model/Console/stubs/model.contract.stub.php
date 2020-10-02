@@ -57,7 +57,7 @@ abstract class <?= $modelName ?> extends <?= $baseModelName ?><?= "\n" ?>
     /**
      * @var string Name of the table, without prefix
      */
-    public $table = '<?= $tableName ?>';
+    protected $table = '<?= $tableName ?>';
 
     public function rules(): array
     {

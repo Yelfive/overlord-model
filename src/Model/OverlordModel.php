@@ -9,7 +9,6 @@ namespace Overlord\Model;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property Carbon $created_at
@@ -19,7 +18,16 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 abstract class OverlordModel extends Model
 {
-    use SoftDeletes;
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+        $this->fillable($this->initFillable());
+    }
+
+    protected function initFillable()
+    {
+        return array_keys($this->rules());
+    }
 
     public function getAttributeLabel(string $attribute = null)
     {

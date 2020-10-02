@@ -48,6 +48,21 @@ class MakeModelCommand extends ModelMakeCommand
         return true;
     }
 
+    //  todo, overlord:model -c App\\Model\\Users should also generate UserController
+//    protected function createController()
+//    {
+//        $controller = Str::studly(class_basename($this->argument('name')));
+//
+//        $modelName = $this->qualifyClass($this->getNameInput());
+//
+//        $this->call('make:controller', array_filter([
+//            'name'  => "{$controller}Controller",
+//            '--model' => $this->option('resource') || $this->option('api') ? $modelName : null,
+//            '--api' => $this->option('api'),
+//        ]));
+//        parent::createController();
+//    }
+
     public function parentHandle()
     {
         // First we need to ensure that the given name is not a reserved word within the PHP
