@@ -10,10 +10,10 @@ namespace Overlord\Model\Console;
 use Carbon\Carbon;
 use fk\helpers\Dumper;
 use fk\helpers\DumperExpression;
+use Overlord\Exceptions\InvalidArgumentException;
 use Overlord\Model\Exceptions\BadTableNameException;
 use Overlord\Model\Support\ColumnSchema;
 use Overlord\Model\Support\TableSchema;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Console\ModelMakeCommand;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -37,39 +37,66 @@ class MakeModelCommand extends ModelMakeCommand
     public function handle()
     {
         do {
-            try {
-//                parent::handle();
-                $this->parentHandle();
-            } catch (BadTableNameException $e) {
-                return false;
-            }
+            $this->modelHandler();
         } while ($this->next());
 
         return true;
     }
 
-    //  todo, overlord:model -c App\\Model\\Users should also generate UserController
-//    protected function createController()
-//    {
-//        $controller = Str::studly(class_basename($this->argument('name')));
-//
-//        $modelName = $this->qualifyClass($this->getNameInput());
-//
-//        $this->call('make:controller', array_filter([
-//            'name'  => "{$controller}Controller",
-//            '--model' => $this->option('resource') || $this->option('api') ? $modelName : null,
-//            '--api' => $this->option('api'),
-//        ]));
-//        parent::createController();
-//    }
+    protected function modelHandler()
+    {
+        if ($this->generatorHandler() === false && !$this->option('force')) {
+            return false;
+        }
 
-    public function parentHandle()
+        if ($this->option('all')) {
+            $this->input->setOption('factory', true);
+            $this->input->setOption('seed', true);
+            $this->input->setOption('migration', true);
+            $this->input->setOption('controller', true);
+            $this->input->setOption('resource', true);
+        }
+
+        if ($this->option('factory')) {
+            $this->createFactory();
+        }
+
+        if ($this->option('migration')) {
+            $this->createMigration();
+        }
+
+        if ($this->option('seed')) {
+            $this->createSeeder();
+        }
+
+        if ($this->option('controller') || $this->option('resource') || $this->option('api')) {
+            $this->createController();
+        }
+
+        if ($this->option('oc')) {
+            $this->createOverlordController();
+        }
+    }
+
+    protected function modelNamespace(): string
+    {
+        return $this->config('namespace', 'App\Models');
+    }
+
+    protected function createOverlordController()
+    {
+        $model = $this->modelNamespace() . '\\' . $this->toModelName($this->currentSchema->getBareTableName());
+
+        $this->call('overlord:controller', ['--model' => $model, 'name' => class_basename($model) . 'Controller']);
+    }
+
+    public function generatorHandler()
     {
         // First we need to ensure that the given name is not a reserved word within the PHP
         // language and that the class name will actually be valid. If it is not valid we
         // can error now and prevent from polluting the filesystem using invalid files.
         if ($this->isReservedName($this->getNameInput())) {
-            $this->error('The name "' . $this->getNameInput() . '" is reserved by PHP.');
+            $this->error('The name "' . $this->getNameInput() . '" is reserved by PHP . ');
 
             return false;
         }
@@ -94,7 +121,6 @@ class MakeModelCommand extends ModelMakeCommand
         // stub files so that it gets the correctly formatted namespace and class name.
         $this->makeDirectory($path);
 
-//        $this->files->put($path, $this->sortImports($this->buildClass($name)));
         $this->buildClass($name);
 
         $this->info($this->type . ' created successfully.');
@@ -179,22 +205,23 @@ class MakeModelCommand extends ModelMakeCommand
         return config('overlord-model.' . $name, $default);
     }
 
+    protected ?TableSchema $currentSchema = null;
+
     /**
      * @param string $name
      * @throws BadTableNameException
      */
     protected function generate(string $name)
     {
-        $schema = $this->getTableSchema($name);
+        $this->currentSchema = $schema = $this->getTableSchema($name);
 
         if (!$schema->columns) {
-            $this->alert(sprintf('No column found for <info>%s</info>, maybe prefix missing ?', $name));
-            throw new BadTableNameException();
+            throw new InvalidArgumentException(sprintf('No column found for <info>%s</info>, maybe prefix missing ?', $name));
         }
 
         [$namespace, $table, $useSoftDeletes] = $this->generateContract($schema);
 
-        $this->generateModelIfNotExists($namespace, $table, $useSoftDeletes, $schema);
+        $this->generateModelIfNotExists($namespace, $table, $useSoftDeletes);
     }
 
     protected function concatPath(...$partials)
@@ -219,8 +246,9 @@ class MakeModelCommand extends ModelMakeCommand
         return ucfirst(Str::singular(Str::camel($tableName)));
     }
 
-    protected function generateModelIfNotExists(string $namespace, string $table, bool $useSoftDeletes, TableSchema $schema)
+    protected function generateModelIfNotExists(string $namespace, string $table, bool $useSoftDeletes)
     {
+        $schema = $this->currentSchema;
         $namespacePartials = explode('\\', $namespace);
         array_pop($namespacePartials);
         $namespace = implode('\\', $namespacePartials);
@@ -479,17 +507,15 @@ class MakeModelCommand extends ModelMakeCommand
     protected function getOptions()
     {
         return array_merge(parent::getOptions(), [
-//            ['dir', 'd', InputOption::VALUE_OPTIONAL, 'Directory for the models to be placed', 'App\Models'],
-//            ['overwrite', null, InputOption::VALUE_NONE, 'Overwrite if model exists when passed'],
-//            ['force', 'f', InputOption::VALUE_NONE, 'Force to create model even when no column fetched from database'],
             ['raw', null, InputOption::VALUE_NONE, 'Return the content to stdout instead of file'],
+            ['oc', null, InputOption::VALUE_NONE, 'To create a <info>O</info>verlord <info>C</info>ontroller. This option requires installation of package <comment>yelfive/laravel-overlord</comment>'],
         ]);
     }
 
     protected function generateContract(TableSchema $schema)
     {
         $table = $schema->getBareTableName();
-        $namespace = $this->config('namespace', 'App\Models') . '\Contracts';
+        $namespace = $this->modelNamespace() . '\Contracts';
 
         $columns = $rules = [];
         $useSoftDeletes = false;
@@ -522,11 +548,7 @@ class MakeModelCommand extends ModelMakeCommand
             'relations' => $relations,
             'uses' => $this->uses,
         ]);
-//        if ($this->option('raw')) {
-//            $this->line($content);
-//        } else {
         $this->write($modelName, $content);
-//        }
 
         return [$namespace, $table, $useSoftDeletes];
     }
