@@ -31,6 +31,7 @@ abstract class OverlordModel extends Model
 
     public function getAttributeLabel(string $attribute = null)
     {
+        // Cache the labels, the labels should not change on the same request.
         static $labels = null;
         if ($labels === null) $labels = $this->i18n();
 
