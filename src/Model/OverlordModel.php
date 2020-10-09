@@ -20,8 +20,8 @@ abstract class OverlordModel extends Model
 {
     public function __construct(array $attributes = [])
     {
-        parent::__construct($attributes);
         $this->fillable($this->initFillable());
+        parent::__construct($attributes);
     }
 
     protected function initFillable()
