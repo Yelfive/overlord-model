@@ -8,10 +8,12 @@
 namespace Overlord\Model\Console;
 
 use Carbon\Carbon;
+use Exception;
 use fk\helpers\Dumper;
 use fk\helpers\DumperExpression;
+use Illuminate\Console\GeneratorCommand;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Overlord\Exceptions\InvalidArgumentException;
-use Overlord\Model\Exceptions\BadTableNameException;
 use Overlord\Model\Support\ColumnSchema;
 use Overlord\Model\Support\TableSchema;
 use Illuminate\Foundation\Console\ModelMakeCommand;
@@ -20,20 +22,44 @@ use Illuminate\Validation\Rule;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
+/**
+ * The generator follows Laravel convention: plural name for the table, singular for the model
+ */
 class MakeModelCommand extends ModelMakeCommand
 {
 
-    /* @noinspection PhpMissingPropertyType */
     protected $name = 'overlord:model';
 
     protected $description = 'Generate model class instead of using `php artisan make:model`';
 
     protected $type = 'Model(s)';
 
+    /**
+     * Contains all class imports and their aliases.
+     *
+     * @var array
+     */
     protected array $uses = [];
 
+    /**
+     * Index to indicates which table is used, in case more than one tables are given
+     *
+     * @var int
+     */
     protected int $offset = 0;
 
+    /**
+     * Current table schema that is used to generate model.
+     * This is internally used by generator.
+     *
+     * @var TableSchema|null
+     */
+    protected ?TableSchema $currentSchema = null;
+
+    /**
+     * @return void|bool
+     * @throws FileNotFoundException
+     */
     public function handle()
     {
         do {
@@ -43,6 +69,13 @@ class MakeModelCommand extends ModelMakeCommand
         return true;
     }
 
+    /**
+     * Copy of {@see ModelMakeCommand::handle()},
+     * custom generator to replace the original {@see GeneratorCommand::handle()}.
+     *
+     * @return bool
+     * @throws FileNotFoundException
+     */
     protected function modelHandler()
     {
         if ($this->generatorHandler() === false && !$this->option('force')) {
@@ -76,6 +109,7 @@ class MakeModelCommand extends ModelMakeCommand
         if ($this->option('oc')) {
             $this->createOverlordController();
         }
+        return true;
     }
 
     protected function modelNamespace(): string
@@ -90,6 +124,12 @@ class MakeModelCommand extends ModelMakeCommand
         $this->call('overlord:controller', ['--model' => $model, 'name' => class_basename($model) . 'Controller']);
     }
 
+    /**
+     * Copy of {@see GeneratorCommand::handle()}, remove the file writes part.
+     *
+     * @return bool
+     * @throws FileNotFoundException
+     */
     public function generatorHandler()
     {
         // First we need to ensure that the given name is not a reserved word within the PHP
@@ -124,8 +164,15 @@ class MakeModelCommand extends ModelMakeCommand
         $this->buildClass($name);
 
         $this->info($this->type . ' created successfully.');
+        return true;
     }
 
+    /**
+     * Return one `name` when queried
+     *
+     * @param null|string $key
+     * @return array|mixed|string|null
+     */
     public function argument($key = null)
     {
         if ($key === 'name') {
@@ -155,7 +202,7 @@ class MakeModelCommand extends ModelMakeCommand
      * Build model class here only.
      * @param string $name
      * @return string|void
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     * @throws FileNotFoundException|Exception
      */
     protected function buildClass($name)
     {
@@ -171,6 +218,9 @@ class MakeModelCommand extends ModelMakeCommand
         $this->uses = [];
     }
 
+    /**
+     * @throws Exception
+     */
     protected function generateModel()
     {
         $this->init();
@@ -185,7 +235,6 @@ class MakeModelCommand extends ModelMakeCommand
 
         $this->writeFile($file, $content);
 
-        // todo, also make model if absent. eg. App\Models\User & App\Models\Contracts\UserContract
         $this->comment(sprintf("%s `%s` %s", 'Contract', $modelName, ($existedAlready ? 'updated.' : 'created.')));
     }
 
@@ -205,11 +254,9 @@ class MakeModelCommand extends ModelMakeCommand
         return config('overlord-model.' . $name, $default);
     }
 
-    protected ?TableSchema $currentSchema = null;
-
     /**
      * @param string $name
-     * @throws BadTableNameException
+     * @throws Exception
      */
     protected function generate(string $name)
     {
@@ -282,6 +329,8 @@ class MakeModelCommand extends ModelMakeCommand
 
     protected function getMethods()
     {
+        // todo, not implemented, should return Model methods like Model::findOrFail
+        //      to generate for @method annotation.
         return [];
     }
 
@@ -294,10 +343,10 @@ class MakeModelCommand extends ModelMakeCommand
      *  // result:
      *  $model = 'Model';
      * @param string $namespace
-     * @param string $model
-     * @return false|string
+     * @param string $model Name of the model, either fully qualified or not
+     * @return string
      */
-    protected function compareModelNamespace($namespace, $model)
+    protected function compareModelNamespace(string $namespace, string $model): string
     {
         $namespace = $namespace . '\\';
         if (strpos($model, $namespace) === 0) {
@@ -318,9 +367,9 @@ class MakeModelCommand extends ModelMakeCommand
      * Rule of one column
      * @param ColumnSchema $column
      * @return array|string
-     * @throws \Exception
+     * @throws Exception
      */
-    protected function getColumnRules($column)
+    protected function getColumnRules(ColumnSchema $column)
     {
         $preferArray = $this->config('prefer_array_rules');
         $rules = [];
@@ -490,7 +539,6 @@ class MakeModelCommand extends ModelMakeCommand
 
     protected function getArguments()
     {
-        // todo, plural of the table name, singular for the model
         return [
             ['names', InputArgument::REQUIRED | InputArgument::IS_ARRAY, 'The name(s) of the class(es) or table(s)'],
         ];
@@ -509,9 +557,15 @@ class MakeModelCommand extends ModelMakeCommand
         return array_merge(parent::getOptions(), [
             ['raw', null, InputOption::VALUE_NONE, 'Return the content to stdout instead of file'],
             ['oc', null, InputOption::VALUE_NONE, 'To create a <info>O</info>verlord <info>C</info>ontroller. This option requires installation of package <comment>yelfive/laravel-overlord</comment>'],
+            // todo, --table to specify table, to generate model not by name convention
         ]);
     }
 
+    /**
+     * @param TableSchema $schema
+     * @return array
+     * @throws Exception
+     */
     protected function generateContract(TableSchema $schema)
     {
         $table = $schema->getBareTableName();
