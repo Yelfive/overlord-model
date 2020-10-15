@@ -29,6 +29,12 @@ abstract class OverlordModel extends Model
         return array_keys($this->rules());
     }
 
+    /**
+     * Get label for this attribute, null if not found
+     *
+     * @param string|null $attribute The attribute to query for, `null` to query for labels for all attributes
+     * @return array|string|null Label to display, `null` if not found
+     */
     public function getAttributeLabel(string $attribute = null)
     {
         // Cache the labels, the labels should not change on the same request.
@@ -38,7 +44,7 @@ abstract class OverlordModel extends Model
         if ($attribute === null) {
             return $this->i18n();
         } else {
-            return $labels[$attribute] ?? $attribute;
+            return $labels[$attribute] ?? null;
         }
     }
 

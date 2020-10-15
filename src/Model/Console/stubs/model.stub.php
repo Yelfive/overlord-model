@@ -10,9 +10,15 @@
  * @var string $model
  * @var string $useHeader
  * @var string $useBody
- * @var \Overlord\Model\Support\ColumnSchema[] $columns
+ * @var ColumnSchema[] $columns
  * @var bool $useSoftDeletes
  */
+
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
+use Overlord\Model\Support\ColumnSchema;
+
+// @formatter:off
 ?>
 <?= '<?php' ?>
 
@@ -20,7 +26,7 @@
 namespace <?= $namespace ?>;
 <?php if ($useSoftDeletes): ?>
 
-use <?= \Illuminate\Database\Eloquent\SoftDeletes::class ?>;
+use <?= SoftDeletes::class ?>;
 
 <?php else: ?>
 
@@ -36,7 +42,7 @@ class <?= $model ?> extends Contracts\<?= $model ?>Contract
     {
         return [
 <?php foreach($columns as $column): ?>
-            '<?= $column->columnName ?>' => __('<?= \Illuminate\Support\Str::snake($model) ?>.<?= $column->columnName ?>'),
+            '<?= $column->columnName ?>' => __('<?= Str::snake($model, '-') ?>.<?= $column->columnName ?>'),
 <?php endforeach; ?>
         ];
     }
