@@ -23,7 +23,9 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * The generator follows Laravel convention: plural name for the table, singular for the model
+ * The generator follows Laravel convention:
+ * plural name for the table, singular for middle table(many-to-many)
+ * and the model
  */
 class MakeModelCommand extends ModelMakeCommand
 {

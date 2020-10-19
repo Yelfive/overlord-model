@@ -15,6 +15,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property Carbon $updated_at
  * @property int $created_by
  * @property int $updated_by
+ *
+ * @method static $this firstOrCreate(array $attributes, array $values = []) @see \Illuminate\Database\Eloquent\Builder::firstOrCreate
+ * @method static $this create(array $attributes = []) @see \Illuminate\Database\Eloquent\Builder::create()
  */
 abstract class OverlordModel extends Model
 {
