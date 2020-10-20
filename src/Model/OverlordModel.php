@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @method static $this firstOrCreate(array $attributes, array $values = []) @see \Illuminate\Database\Eloquent\Builder::firstOrCreate
  * @method static $this create(array $attributes = []) @see \Illuminate\Database\Eloquent\Builder::create()
+ * @method static bool insert(array $values) @see \Illuminate\Database\Eloquent\Builder::insert()
  */
 abstract class OverlordModel extends Model
 {
