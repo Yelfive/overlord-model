@@ -8,6 +8,7 @@
 namespace Overlord\Model;
 
 use Carbon\Carbon;
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static $this firstOrCreate(array $attributes, array $values = []) @see \Illuminate\Database\Eloquent\Builder::firstOrCreate
  * @method static $this create(array $attributes = []) @see \Illuminate\Database\Eloquent\Builder::create()
  * @method static bool insert(array $values) @see \Illuminate\Database\Eloquent\Builder::insert()
+ * @method static $this findOrFail(mixed|array|Arrayable $id, array $columns = ['*']) @see \Illuminate\Database\Eloquent\Builder::findOrFail()
  */
 abstract class OverlordModel extends Model
 {
