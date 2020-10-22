@@ -41,14 +41,14 @@ abstract class OverlordModel extends Model
      * @param string|null $attribute The attribute to query for, `null` to query for labels for all attributes
      * @return array|string|null Label to display, `null` if not found
      */
-    public function getAttributeLabel(string $attribute = null)
+    public static function getAttributeLabel(string $attribute = null)
     {
         // Cache the labels, the labels should not change on the same request.
         static $labels = null;
-        if ($labels === null) $labels = $this->i18n();
+        if ($labels === null) $labels = (new static)->i18n();
 
         if ($attribute === null) {
-            return $this->i18n();
+            return $labels;
         } else {
             return $labels[$attribute] ?? null;
         }

@@ -10,4 +10,5 @@ return [
     'base_model' => \Overlord\Model\OverlordModel::class,
     'dir' => 'app\Models',
     'prefer_array_rules' => true,
+    'global_trans_keys' => ['id', 'created_at', 'updated_at', 'deleted_at'],
 ];

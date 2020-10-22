@@ -42,7 +42,7 @@ class <?= $model ?> extends Contracts\<?= $model ?>Contract
     {
         return [
 <?php foreach($columns as $column): ?>
-            '<?= $column->columnName ?>' => __('<?= Str::snake($model, '-') ?>.<?= $column->columnName ?>'),
+            '<?= $column->columnName ?>' => __('<?= in_array($column->columnName, $this->globalKeys) ? Str::title(str_replace('_', ' ', $column->columnName)) : Str::snake($model, '-') . '.' . $column->columnName ?>'),
 <?php endforeach; ?>
         ];
     }
