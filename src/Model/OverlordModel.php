@@ -10,6 +10,8 @@ namespace Overlord\Model;
 use Carbon\Carbon;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * @property Carbon $created_at
@@ -21,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static $this create(array $attributes = []) @see \Illuminate\Database\Eloquent\Builder::create()
  * @method static bool insert(array $values) @see \Illuminate\Database\Eloquent\Builder::insert()
  * @method static $this findOrFail(mixed|array|Arrayable $id, array $columns = ['*']) @see \Illuminate\Database\Eloquent\Builder::findOrFail()
+ * @method static Builder groupBy(...$groups)
  */
 abstract class OverlordModel extends Model
 {
@@ -52,6 +55,17 @@ abstract class OverlordModel extends Model
         } else {
             return $labels[$attribute] ?? null;
         }
+    }
+
+    /**
+     * @alias
+     * @param string|null $attribute
+     * @return array|string|null
+     * @see getAttributeLabel
+     */
+    public static function __(string $attribute = null)
+    {
+        return static::getAttributeLabel($attribute);
     }
 
     /**
