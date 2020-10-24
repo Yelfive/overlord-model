@@ -13,6 +13,7 @@ use fk\helpers\Dumper;
 use fk\helpers\DumperExpression;
 use Illuminate\Console\GeneratorCommand;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Illuminate\Filesystem\Filesystem;
 use Overlord\Exceptions\InvalidArgumentException;
 use Overlord\Model\Support\ColumnSchema;
 use Overlord\Model\Support\TableSchema;
@@ -60,15 +61,28 @@ class MakeModelCommand extends ModelMakeCommand
 
     protected array $globalTransKeys = [];
 
+    public function __construct(Filesystem $files)
+    {
+        parent::__construct($files);
+
+        $this->globalTransKeys = $this->config('global_trans_keys');
+    }
+
+    protected function init()
+    {
+        $this->uses = [];
+        $this->currentSchema = null;
+        $this->offset = 0;
+    }
+
     /**
      * @return void|bool
      * @throws FileNotFoundException
      */
     public function handle()
     {
-        $this->globalTransKeys = $this->config('global_trans_keys');
-
         do {
+            $this->init();
             $this->modelHandler();
         } while ($this->next());
 
@@ -219,17 +233,11 @@ class MakeModelCommand extends ModelMakeCommand
         }
     }
 
-    protected function init()
-    {
-        $this->uses = [];
-    }
-
     /**
      * @throws Exception
      */
     protected function generateModel()
     {
-        $this->init();
         $this->generate($this->argument('name'));
     }
 
