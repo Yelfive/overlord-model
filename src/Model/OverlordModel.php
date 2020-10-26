@@ -58,14 +58,16 @@ abstract class OverlordModel extends Model
     }
 
     /**
-     * @alias
-     * @param string|null $attribute
-     * @return array|string|null
+     * Similar to {@see __()} helper, except that this method translates given
+     * `$attribute` by calling preset {@see i18n()}
+     *
+     * @param string $attribute
+     * @return array|string
      * @see getAttributeLabel
      */
-    public static function __(string $attribute = null)
+    public static function __(string $attribute)
     {
-        return static::getAttributeLabel($attribute);
+        return static::getAttributeLabel($attribute) ?? $attribute;
     }
 
     /**
