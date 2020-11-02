@@ -14,7 +14,6 @@ use fk\helpers\DumperExpression;
 use Illuminate\Console\GeneratorCommand;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Filesystem\Filesystem;
-use Overlord\Exceptions\InvalidArgumentException;
 use Overlord\Model\Support\ColumnSchema;
 use Overlord\Model\Support\TableSchema;
 use Illuminate\Foundation\Console\ModelMakeCommand;
@@ -408,36 +407,34 @@ class MakeModelCommand extends ModelMakeCommand
                 $rules = ['integer'];
                 if ($column->columnType === 'tinyint') {
                     if ($column->unsigned) {
-                        $rules[] = 'min:0';
-                        $rules[] = 'max:255';
+                        array_push($rules, 'min:0', 'max:255');
                     } else {
-                        $rules[] = 'min:-128';
-                        $rules[] = 'max:127';
+                        array_push($rules, 'min:-128', 'max:127');
                     }
                 }
                 if ($column->columnType === 'smallint') {
                     if ($column->unsigned) {
-                        $rules[] = 'min:0';
-                        $rules[] = 'max:65535';
+                        array_push($rules, 'min:0', 'max:65535');
                     } else {
-                        $rules[] = 'min:32768';
-                        $rules[] = 'max:-32767';
+                        array_push($rules, 'min:-32768', 'max:32767');
                     }
                 } else if ($column->columnType === 'mediumint') {
                     if ($column->unsigned) {
-                        $rules[] = 'min:0';
-                        $rules[] = 'max:16777215';
+                        array_push($rules, 'min:0', 'max:16777215');
                     } else {
-                        $rules[] = 'min:-8388608';
-                        $rules[] = 'max:8388607';
+                        array_push($rules, 'min:-8388608', 'max:8388607');
                     }
                 } else if ($column->columnType === 'int') {
                     if ($column->unsigned) {
-                        $rules[] = 'min:0';
-                        $rules[] = 'max:4294967295';
+                        array_push($rules, 'min:0', 'max:4294967295');
                     } else {
-                        $rules[] = 'min:-2147683648';
-                        $rules[] = 'max:2147683647';
+                        array_push($rules, 'min:-2147683648', 'max:2147683647');
+                    }
+                } else {
+                    if ($column->unsigned) {
+                        array_push($rules, 'min:0'); // `bigint` has exceeded PHP_INT_MAX
+                    } else {
+                        array_push($rules, 'min:' . -PHP_INT_MIN, 'max:' . PHP_INT_MAX);
                     }
                 }
                 break;
