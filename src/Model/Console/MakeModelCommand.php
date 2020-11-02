@@ -189,9 +189,10 @@ class MakeModelCommand extends ModelMakeCommand
         // stub files so that it gets the correctly formatted namespace and class name.
         $this->makeDirectory($path);
 
-        $this->buildClass($name);
+        if ($this->buildClass($name)) {
+            $this->info($this->type . ' created successfully.');
+        }
 
-        $this->info($this->type . ' created successfully.');
         return true;
     }
 
@@ -246,7 +247,7 @@ class MakeModelCommand extends ModelMakeCommand
      */
     protected function generateModel()
     {
-        $this->generate($this->argument('name'));
+        return $this->generate($this->argument('name'));
     }
 
     protected function write(string $modelName, string $content)
@@ -278,19 +279,22 @@ class MakeModelCommand extends ModelMakeCommand
 
     /**
      * @param string $name
+     * @return bool
      * @throws Exception
      */
-    protected function generate(string $name)
+    protected function generate(string $name): bool
     {
         $this->currentSchema = $schema = $this->getTableSchema($name);
 
         if (!$schema->columns) {
-            throw new InvalidArgumentException(sprintf('No column found for <info>%s</info>, maybe prefix missing ?', $name));
+            $this->output->warning(sprintf('No column found for `%s`, maybe prefix missing?', $name));
+            return false;
         }
 
         [$namespace, $table, $useSoftDeletes] = $this->generateContract($schema);
 
         $this->generateModelIfNotExists($namespace, $table, $useSoftDeletes);
+        return true;
     }
 
     protected function concatPath(...$partials)

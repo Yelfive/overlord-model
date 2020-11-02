@@ -11,10 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class TableSchema
 {
-
-//    public $tableSchema;
     protected string $tableName;
-
     protected string $tablePrefix;
     protected string $databaseName;
 
@@ -27,14 +24,13 @@ class TableSchema
     {
         $this->tablePrefix = DB::getTablePrefix();
         $this->databaseName = DB::getDatabaseName();
-        // todo, also try table with out prefix, exact match comes first.
-        $this->tableName = "{$this->tablePrefix}{$table}";
-        $this->queryColumns();
+        $this->queryColumns($this->tableName = $table);
     }
 
-    protected function queryColumns()
+    protected function queryColumns(string $table, $isFinal = false)
     {
-        $columns = DB::select('SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME =?', [$this->databaseName, $this->tableName]);
+        $columns = DB::select('SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME =?', [$this->databaseName, $table]);
+        if (empty($columns) && !$isFinal) $this->queryColumns($this->tableName = "{$this->tablePrefix}{$table}", true);
         foreach ($columns as $column) {
             $this->columns[] = new ColumnSchema($column);
         }
