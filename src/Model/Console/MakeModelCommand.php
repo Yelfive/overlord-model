@@ -72,7 +72,6 @@ class MakeModelCommand extends ModelMakeCommand
     {
         $this->uses = [];
         $this->currentSchema = null;
-        $this->offset = 0;
     }
 
     /**
@@ -81,12 +80,21 @@ class MakeModelCommand extends ModelMakeCommand
      */
     public function handle()
     {
+        $this->reset();
         do {
             $this->init();
             $this->modelHandler();
         } while ($this->next());
 
         return true;
+    }
+
+    /**
+     * Reset the offset to 0
+     */
+    protected function reset()
+    {
+        $this->offset = 0;
     }
 
     /**

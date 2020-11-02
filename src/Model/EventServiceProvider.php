@@ -8,7 +8,7 @@ namespace Overlord\Model;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Overlord\Model\Events\ModelSaving;
-use Overlord\Model\Listeners\CheckRules;
+use Overlord\Model\Listeners\ValidateModelByRules;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -18,8 +18,6 @@ class EventServiceProvider extends ServiceProvider
      * @var array
      */
     protected $listen = [
-        ModelSaving::class => [
-            CheckRules::class,
-        ],
+        ModelSaving::class => [ValidateModelByRules::class],
     ];
 }
