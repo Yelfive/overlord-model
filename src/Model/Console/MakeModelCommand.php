@@ -411,8 +411,7 @@ class MakeModelCommand extends ModelMakeCommand
                     } else {
                         array_push($rules, 'min:-128', 'max:127');
                     }
-                }
-                if ($column->columnType === 'smallint') {
+                } else if ($column->columnType === 'smallint') {
                     if ($column->unsigned) {
                         array_push($rules, 'min:0', 'max:65535');
                     } else {
@@ -434,7 +433,7 @@ class MakeModelCommand extends ModelMakeCommand
                     if ($column->unsigned) {
                         array_push($rules, 'min:0'); // `bigint` has exceeded PHP_INT_MAX
                     } else {
-                        array_push($rules, 'min:' . -PHP_INT_MIN, 'max:' . PHP_INT_MAX);
+                        array_push($rules, 'min:' . PHP_INT_MIN, 'max:' . PHP_INT_MAX);
                     }
                 }
                 break;
